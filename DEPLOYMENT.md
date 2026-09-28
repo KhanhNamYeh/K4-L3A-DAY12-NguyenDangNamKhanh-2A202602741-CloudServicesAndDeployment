@@ -10,34 +10,35 @@
 
 | Mục | Nội dung |
 |-----|----------|
-| Họ và tên | (điền họ tên) |
-| Mã học viên | (điền mã học viên) |
-| Repo | (điền link repo K4-L3A-DAY12-HoVaTen-MSSV-CloudServicesAndDeployment) |
+| Họ và tên | Nguyen Dang Nam Khanh |
+| Mã học viên | 2A202602741 |
+| Repo | https://github.com/KhanhNamYeh/K4-L3A-DAY12-NguyenDangNamKhanh-2A202602741-CloudServicesAndDeployment |
 
 ## Service
 
 | Mục | Nội dung |
 |-----|----------|
-| Public URL | https://TODO-thay-bang-url-that.up.railway.app |
-| Platform | Railway / Render / Cloud Run — (điền platform bạn dùng) |
-| Ngày deploy | (điền ngày) |
+| Public URL | Không có — dùng phương án dự phòng, service chạy ở `http://localhost:8000` |
+| Platform | Local fallback: `docker compose` trên máy cá nhân (không deploy lên Railway / Render / Cloud Run) |
+| Ngày chạy | 2026-09-28 |
 
-## Biến Môi Trường Đã Set Trên Cloud
+## Biến Môi Trường Đã Set
 
-Ghi tên biến và **nguồn giá trị**, không ghi giá trị:
+Chạy bằng `docker compose` nên biến môi trường đến từ `docker-compose.yml` và
+file `.env` ở máy (không commit). Chỉ ghi tên và nguồn, không ghi giá trị:
 
 | Biến | Đã set | Ghi chú |
 |------|--------|---------|
-| `PORT` | ✅ | platform tự gán |
-| `AGENT_API_KEY` | ✅ | đặt trong dashboard, không nằm trong repo |
-| `REDIS_URL` | ✅ | (điền: Redis add-on của platform / Upstash / ...) |
+| `PORT` | ✅ | mặc định 8000 trong Dockerfile (`ENV PORT=8000`) |
+| `AGENT_API_KEY` | ✅ | nội suy `${AGENT_API_KEY}` từ `.env` cục bộ, không nằm trong repo |
+| `REDIS_URL` | ✅ | `redis://redis:6379/0` — service `redis` (redis:7-alpine) trong cùng compose |
 | `RATE_LIMIT_PER_MINUTE` | ✅ | 10 |
 | `MONTHLY_BUDGET_USD` | ✅ | 10.0 |
 | `LOG_LEVEL` | ✅ | INFO |
 
 ## Lệnh Kiểm Tra
 
-Thay `<URL>` bằng Public URL ở trên:
+Với phương án dự phòng, `<URL>` là `http://localhost:8000`:
 
 ```bash
 # 1. Liveness — mong đợi 200 {"status":"ok"}
@@ -68,34 +69,74 @@ for i in $(seq 1 15); do
 done; echo
 ```
 
+> Trên Windows (Git Bash), câu hỏi có dấu truyền thẳng qua `-d` bị hỏng mã
+> hóa trước khi tới server (`There was an error parsing the body`). Lệnh 4 được
+> chạy bằng `--data-binary @q.json` với file UTF-8 chứa cùng nội dung.
+
 ## Kết Quả Chạy Thật
 
-Dán output của các lệnh trên vào đây:
+Output chạy ngày 2026-09-28 với `URL=http://localhost:8000`:
 
 ```
-(điền output)
+$ curl -i $URL/health
+HTTP/1.1 200 OK
+date: Mon, 28 Sep 2026 14:15:38 GMT
+server: uvicorn
+content-length: 57
+content-type: application/json
+
+{"status":"ok","service":"day12-agent","version":"1.0.0"}
+
+$ curl -i $URL/ready
+HTTP/1.1 200 OK
+date: Mon, 28 Sep 2026 14:15:38 GMT
+server: uvicorn
+content-length: 31
+content-type: application/json
+
+{"status":"ready","redis":true}
+
+$ curl -i -X POST $URL/ask  (không có API key)
+HTTP/1.1 401 Unauthorized
+date: Mon, 28 Sep 2026 14:15:38 GMT
+server: uvicorn
+content-length: 39
+content-type: application/json
+
+{"detail":"invalid or missing API key"}
+
+$ curl -i -X POST $URL/ask -H "X-API-Key: $AGENT_API_KEY" -H "X-User-Id: sv-test"  (question: "Deploy là gì?")
+HTTP/1.1 200 OK
+date: Mon, 28 Sep 2026 14:15:38 GMT
+server: uvicorn
+content-length: 279
+content-type: application/json
+
+{"answer":"Câu hỏi hay. Deploy là gì thường được giải quyết bằng cách chuẩn hóa môi trường chạy: cùng một image chạy giống nhau ở laptop và trên cloud.","user_id":"sv-test","history_length":0,"cost_usd":2.145e-05,"tokens":{"in":3,"out":35}}
+
+$ for i in $(seq 1 15); do curl ... /ask; done   (rate limit, cùng user sv-test)
+200 200 200 200 200 200 200 200 200 429 429 429 429 429 429
 ```
+
+Vòng lặp chỉ có 9 lần 200 vì lệnh 4 ngay trước đó đã dùng 1 trong 10
+request/phút của `sv-test` trong cùng cửa sổ 60 giây.
 
 ## Ảnh Chụp Màn Hình
 
 Đặt ảnh trong thư mục `screenshots/`:
 
-- `screenshots/dashboard.png` — trang quản lý service trên platform
+- `screenshots/compose-ps.png` — terminal chạy `docker compose ps` (agent + redis healthy)
 - `screenshots/health.png` — kết quả gọi `/health` từ trình duyệt hoặc curl
 
 ---
 
-## Nếu Dùng Phương Án Dự Phòng
+## Phương Án Dự Phòng
 
-Không đăng ký được tài khoản cloud? Vẫn nộp được bài, nhưng CP5 tối đa 60% điểm:
-
-1. Đặt `LOCAL_FALLBACK=true` trong `.env`
-2. Chạy `docker compose up -d` rồi kiểm tra `docker compose ps`
-3. Chụp màn hình vào `screenshots/`
-4. Chạy `pytest tests/test_cp5.py -v` — bộ test sẽ tự chuyển sang kiểm tra
-   `http://localhost:8000`
-5. Ghi rõ lý do không deploy được vào phần dưới đây:
+Bài dùng `LOCAL_FALLBACK=true`: stack `agent` + `redis` chạy bằng
+`docker compose up -d` ở máy cá nhân, `pytest tests/test_cp5.py` kiểm tra
+`http://localhost:8000`.
 
 ```
-(điền lý do nếu dùng phương án dự phòng, ngược lại xóa mục này)
+Lý do không deploy lên cloud: học viên chọn phương án dự phòng, không tạo
+service trên Railway/Render.
 ```

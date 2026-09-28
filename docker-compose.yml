@@ -38,7 +38,10 @@ services:
   agent:
     build: .
     ports:
-      - "8000:8000"
+      # Dải cổng thay vì 8000:8000 cố định: `--scale agent=3` cần mỗi replica
+      # một cổng host riêng (8000, 8001, 8002), nếu không 2 replica sau lỗi
+      # "port is already allocated".
+      - "8000-8002:8000"
     environment:
       # Nội suy từ file .env; `:?` làm compose dừng ngay nếu biến chưa được set
       AGENT_API_KEY: ${AGENT_API_KEY:?AGENT_API_KEY chưa được set trong .env}
